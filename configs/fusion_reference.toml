@@ -1,0 +1,85 @@
+# Fusion concept model. SI units: m, kg, s, rad.
+# Motor positions, structure mass, density and joint limits are estimates.
+# Bounds are provisional exploration ranges, not hardware limits.
+# v2: coaxial hip/knee stack; axial_gap and thigh_axial_offset are mounting estimates.
+# pair_half_spacing applies only to legacy v1 snapshots.
+# z offset = shoulder minus hind hip; negative means shoulder lower.
+profile = "fusion_reference_v2"
+l_upperarm = 0.325
+l_lowerarm = 0.34
+l_thigh = 0.34
+l_shank = 0.4
+w_shoulder = 0.45
+w_hip = 0.5
+d_hip_shoulder = 0.7
+z_offset_hip_shoulder = -0.03
+torso_mass = 8.0
+link_density = 1000.0
+
+[motor]
+"mass" = 1.4
+"diameter" = 0.1075
+"length" = 0.0435
+"envelope_diameter" = 0.118
+"envelope_length" = 0.06
+"extra_mass" = 0.0
+"pair_half_spacing" = 0.075
+"roll_inboard" = 0.08
+"pitch_outboard" = 0.03
+"axial_gap" = 0.005
+"thigh_axial_offset" = 0.0
+
+[stance]
+"hip_height" = 0.55
+"body_pitch" = 0.0
+"front_width" = 0.5
+"hind_width" = 0.55
+"front_x" = 0.0
+"hind_x" = 0.0
+"mode" = "quadruped"
+"upright_hip_height" = 0.55
+"upright_pitch" = -1.5707963267948966
+"upright_hind_width" = 0.7
+"upright_hind_x" = 0.05
+"front_roll" = 0.0
+"front_hip" = 0.45
+"front_knee" = -1.2
+
+[limits]
+"roll" = [-0.52, 0.52]
+"hip" = [-1.35, 1.35]
+"knee" = [-2.5, -0.15]
+
+[upright_limits]
+"roll" = [-0.52, 0.52]
+"hip" = [-1.35, 2.8]
+"knee" = [-2.5, -0.15]
+
+[payload]
+"mass" = 2
+"size" = [0.2, 0.16, 0.12]
+"position" = [0.0, 0.0, 0.12]
+
+[bounds]
+"stance.upright_hip_height" = [0.4, 0.65]
+"stance.upright_pitch" = [-1.7, -1.05]
+"stance.upright_hind_width" = [0.6, 0.8]
+"stance.upright_hind_x" = [-0.15, 0.15]
+"l_upperarm" = [0.295, 0.355]
+"l_lowerarm" = [0.31, 0.37]
+"l_thigh" = [0.31, 0.37]
+"l_shank" = [0.37, 0.43]
+"w_shoulder" = [0.42, 0.48]
+"w_hip" = [0.47, 0.53]
+"d_hip_shoulder" = [0.65, 0.75]
+"z_offset_hip_shoulder" = [-0.05, -0.01]
+"torso_mass" = [1.0, 40.0]
+"link_density" = [100.0, 8000.0]
+"stance.hip_height" = [0.4, 0.65]
+"stance.body_pitch" = [-0.15, 0.15]
+"stance.front_width" = [0.4, 0.65]
+"stance.hind_width" = [0.45, 0.7]
+"stance.front_x" = [-0.1, 0.1]
+"stance.hind_x" = [-0.1, 0.1]
+"payload.mass" = [0.0, 20.0]
+"motor.extra_mass" = [0.0, 1.0]

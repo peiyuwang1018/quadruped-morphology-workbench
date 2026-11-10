@@ -1,0 +1,17 @@
+[build-system]
+requires = ["hatchling>=1.26,<2"]
+build-backend = "hatchling.build"
+
+[project]
+name = "quadruped-codesign"
+version = "0.1.0"
+description = "A small, native MuJoCo morphology sandbox for quadruped co-design"
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+dependencies = ["mujoco>=3.3,<4", "numpy>=2,<3", "pillow>=11,<13"]
+
+[project.scripts]
+quadruped = "quadruped_codesign.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/quadruped_codesign"]

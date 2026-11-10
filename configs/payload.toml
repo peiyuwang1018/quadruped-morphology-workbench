@@ -1,0 +1,14 @@
+# 最小实验：保持腿长不变，只改 payload 的位置。
+# thigh_length / shank_length 是后肢；前肢省略时跟随后肢。
+thigh_length = 0.22
+shank_length = 0.20
+front_thigh_length = 0.22
+front_shank_length = 0.20
+torso_mass = 8.0  # kg，沿用学习模型
+
+[payload]
+mass = 2.0  # kg；演示值，不代表真实货物需求。设 0 时移除载荷。
+size = [0.20, 0.16, 0.12]  # 完整长宽高，m，均匀方块
+position = [0.0, 0.0, 0.12]  # 方块中心，机身坐标：x前、y左、z上
+# 第一个实验：只把 position 的第一个数从 0.0 改成 0.12。
+# 其余不变；质心应向前移动，总质量应不变。
