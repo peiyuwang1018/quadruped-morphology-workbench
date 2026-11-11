@@ -4,6 +4,8 @@ A lightweight MuJoCo workbench for parametric quadruped design, inverse-kinemati
 
 [中文说明](README_ZH.md) · [Detailed controls](README_EN.md) · [Sources and provenance](SOURCES.md)
 
+Implementation principles: [English](documents/kinematics-dynamics-en.md) · [中文](documents/kinematics-dynamics-zh.md). Covers analytic IK, mass/inertia, support geometry and static joint loads.
+
 ![Four-foot and hind-leg upright pose previews](docs/images/pose-preview.png)
 
 ## Features
@@ -12,9 +14,12 @@ A lightweight MuJoCo workbench for parametric quadruped design, inverse-kinemati
 - Explore coaxial, proximally mounted hip/knee drive-module geometry, nominal module masses and clearance envelopes.
 - Adjust body height, pitch and foot targets with analytic inverse kinematics, including the lateral upper-link offset.
 - Switch between four-foot and hind-leg upright **frozen poses**, preserving each mode's targets.
+- Adjust mirrored shoulder roll, shoulder pitch and elbow angle in the upright **Front limbs** controls, with live CoM feedback.
 - Attach an independent fixed box payload and recompute mass, center of mass (CoM) and inertia.
+- Inspect each rigid body or its descendants: mass breakdown, local/world CoM, inertia, joint angles and derived dimensions, with a highlighted selection.
 - Visualize the CoM, its ground projection, and a four-foot support polygon or two-foot support segment.
 - Align the projected CoM by searching bounded foot targets and rerunning IK and geometry checks.
+- Evaluate a gravity-only static baseline with equal left/right vertical loads; report joint-output torque demands only when whole-model equilibrium checks pass.
 - Save reproducible candidates with configuration, MJCF, validation report and rendered image.
 
 ## Foundation and research references
@@ -57,6 +62,8 @@ Try the first interaction:
 
 The Fusion panel displays distances in **mm**, angles in **degrees**, and mass in **kg**. Configuration and MJCF files use SI units. CoM readouts use world coordinates. Invalid inputs keep the previous valid preview and disable saving.
 
+Toggle **Inspect** above the preview to replace the parameter sidebar with **Mass / Pose / Model / Static** readouts. Choose a body and either **Selected body** or **Body + descendants**. Static checks the whole model under an explicit load-sharing rule. Uncheck **Inspect** to edit parameters again. See [model inspector](docs/model-inspector.md) and [static loads](docs/static-loads.md) for short experiments and definitions.
+
 ## Generate and inspect without the panel
 
 ```sh
@@ -77,7 +84,7 @@ Saved panel candidates appear under `outputs/panel/<timestamp>/`:
 |---|---|
 | `config.toml` | Morphology, both pose settings, mounting assumptions and bounds |
 | `robot.xml` | Corresponding compiled-compatible MuJoCo MJCF |
-| `validation.json` | Kinematics, mass/inertia checks, support geometry and scope |
+| `validation.json` | Kinematics, mass/inertia checks, support geometry, body inspection, static loads and scope |
 | `preview.png` | Current camera render, including enabled overlays |
 | `README.txt` | Snapshot scope and reopening instructions |
 
@@ -91,6 +98,8 @@ Module shapes, link density, frame mass, joint ranges and some mounting offsets 
 
 Four-foot projection inside a support polygon is a geometric check. Two ideal point feet form a zero-area support segment; alignment to that segment does not verify stable balance, contact-force feasibility or actuator capacity. No standing or walking controller is provided. Collision checks cover the declared proxy geometry at the inspected pose, not full CAD assembly clearance.
 
+The separate **Static** check uses equal left/right, nonnegative vertical foot loads and evaluates both world wrench balance and the unactuated floating-base residual. Its torques are ideal joint-output requirements, not motor-shaft loads or capacity checks. Lateral CoM offsets are outside this first equal-sharing baseline. Unbalanced candidates remain saveable and have no reported standing-torque solution. Details: [static-load assumptions](docs/static-loads.md).
+
 Details: [Fusion model assumptions](docs/fusion-reference.md) · [Pose switching and support geometry](docs/support-preview.md).
 
 ## Tests
@@ -101,7 +110,7 @@ Details: [Fusion model assumptions](docs/fusion-reference.md) · [Pose switching
 QUADRUPED_UI_TESTS=1 .venv/bin/python -m unittest discover -s tests -v
 ```
 
-The current desktop suite has 41 tests covering analytic FK/IK, masses/inertia, motor ownership and placement, invalid-input rollback, snapshot round trips, support geometry, bounded alignment and renderer replacement. Linux deployment and workstation training require separate validation.
+The desktop suite covers analytic FK/IK, masses/inertia, motor ownership and placement, mirrored front-limb edits, body/subtree inspection with rotated inertia aggregation, invalid-input rollback, snapshot round trips, support geometry, bounded alignment and renderer replacement. Linux deployment and workstation training require separate validation.
 
 ## Layout
 
@@ -112,6 +121,9 @@ src/quadruped_codesign/
   panel.py, fusion_panel.py    Native English parameter UI
   panel_model.py               Configuration and candidate snapshots
   mass_properties.py           Mass, CoM and inertia calculations
+  inspection.py                Compiled body/subtree and pose readouts
+  statics.py                   Vertical pair loads and ideal joint-output demands
+  inspector_panel.py           Read-only inspector and scope selection
   support.py, posture.py       Support geometry, overlay and bounded alignment
   generator.py, validation.py  Legacy generator and numerical checks
   visualization.py, cli.py     MuJoCo rendering, viewer and commands

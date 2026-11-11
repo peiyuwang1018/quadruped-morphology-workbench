@@ -13,6 +13,8 @@ from .generator import Morphology, Payload, generate_mjcf
 from .fusion import FusionShape, generate_fusion_mjcf, evaluate_fusion
 from .validation import evaluate_robot
 from .visualization import preview_data
+from .inspection import inspect_model
+from .statics import evaluate_statics
 
 
 def load_morphology(path: Path) -> Morphology | FusionShape:
@@ -76,7 +78,10 @@ class Preview:
                 raise ValueError(f"Model parts overlap: {first} / {second} ({-distance*1000:.2f} mm). Check geometry or stance.")
             failed = [name for name, passed in report["checks"].items() if not passed]
             raise ValueError("Model checks failed: " + ", ".join(failed))
-        return cls(shape, xml, model, preview_data(model), report)
+        data = preview_data(model)
+        report["inspection"] = inspect_model(model, data, shape)
+        report["statics"] = evaluate_statics(model, data, report.get("support"))
+        return cls(shape, xml, model, data, report)
 
     def save(self, parent: Path, image) -> Path:
         """Save a consistent, validated snapshot without overwriting prior experiments."""
@@ -93,6 +98,10 @@ class Preview:
             (folder / "README.txt").write_text(
                 "Frozen morphology preview. Mass, CoM, inertia and kinematics checked.\n"
                 "No controlled balance, walking, gravity-drop or Isaac Lab tests were run by the panel.\n"
+                "validation.json includes body/subtree mass, CoM, inertia and derived pose metrics.\n"
+                "statics reports ideal vertical-load equilibrium under equal left/right sharing.\n"
+                "Joint-output torques are reported only when balance checks pass; they are not motor-shaft demands or capacity checks.\n"
+                "Inspector highlights and selected CoM markers are render-only, not physical model changes.\n"
                 + (f"Pose: {self.shape.stance.mode}. Declared geometric foot contacts solved.\n"
                    "CoM/support overlay is render-only. A two-point support line has zero area.\n"
                    "Mounting proxies, masses and separate upright joint limits are uncalibrated.\n"

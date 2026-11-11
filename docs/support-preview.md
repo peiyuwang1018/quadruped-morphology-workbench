@@ -38,11 +38,21 @@ Upright exploration windows are stored in `[bounds]`: height 0.40–0.65 m, pitc
 - **Cyan support:** the convex hull of the declared ground-contact points. Four feet usually form a polygon; two ideal point feet form a finite line segment.
 - Numeric CoM readouts now use **world coordinates** in mm to match the markers. The saved report still includes both world-frame and torso-frame CoM.
 
-The four-foot display reports the minimum signed inward distance to the polygon edges. An outside point has a negative margin. Upright mode instead reports distance to the **finite segment**, including its endpoints; a point on the infinite extension is not accepted. Even when aligned, a two-point support line has zero area and zero positive transverse margin. The display therefore keeps an amber “balance NOT verified” message.
+The four-foot display reports the minimum signed inward distance to the polygon edges. An outside point has a negative margin. Upright mode instead reports distance to the **finite segment**, including its endpoints; a point on the infinite extension is not accepted. Even when aligned, a two-point support line has zero area and zero positive transverse margin. The display therefore keeps an amber “stability NOT verified” message, including when the separate ideal static-load check passes.
 
 The overlay is made with MuJoCo render-only geoms, refreshed after every scene update. It adds no physical bodies, masses, contacts, joints or forces. **Show CoM** hides only the overlay. The panel's PNG includes it; the physical MJCF does not. The numeric support analysis is saved in `validation.json`.
 
 ## Align CoM projection
+
+### Adjust the free front limbs first
+
+In upright mode, **Stance** has **Body & feet** and **Front limbs** pages. The latter exposes `front_roll` (Shoulder roll), `front_hip` (Shoulder pitch) and `front_knee` (Elbow angle) in degrees. These are direct joint commands for a frozen pose, not front-endpoint IK or a controller. Defaults remain 0, 0.45 and −1.2 rad.
+
+The left arm uses the entered roll; the right uses its negative. Shoulder pitch and elbow angle are shared. Each slider uses the corresponding saved `[upright_limits]`; mirrored roll uses the intersection valid for both signs. These remain unverified concept limits. Model checks still reject collisions even when angles lie inside the slider ranges.
+
+An arm edit recomputes the model, CoM and projection error while preserving morphology, mass and hind foot targets. It does **not** silently run alignment. Use the alignment button separately to observe the difference. Invalid edits keep the previous valid preview and disable saving. Both mode switching and saved snapshots retain the arm settings; older configurations keep their saved angles or receive the existing defaults when those fields are absent.
+
+### Run alignment
 
 This button searches within the existing foot-x bounds:
 
@@ -57,6 +67,8 @@ In the default upright example, the fore/aft line error decreased from about **3
 
 41 tests passed, including the original 33 and eight new support/pose tests. Coverage includes polygon/finite-segment geometry, positive-vs-zero margin semantics, independent MuJoCo subtree-CoM comparison, rotated payload contribution, two hind contacts with raised front limbs, explicit upright limits, bounded alignment and rollback, reduced module clearance, dual-pose save/reload, UI switching and render-only overlay pixel checks. Screenshots of both modes and upright alignment were inspected.
 
-Geometric support is only an initial screening step under flat-ground, gravity-only, ideal point-contact assumptions. Ground reaction forces, friction, motor torque limits, transmission dynamics, contact compliance and feedback control remain unverified. See [Feasible Region: an Actuation-Aware Extension of the Support Region](https://arxiv.org/abs/1903.07999) for why support geometry alone does not establish actuator feasibility. Rendering follows the official [MuJoCo visualization API](https://mujoco.readthedocs.io/en/3.17.0/APIreference/APIfunctions.html#mjv-initgeom).
+Geometric support is only an initial screening step under flat-ground, gravity-only, ideal point-contact assumptions. The geometric overlay does not compute ground reactions. Friction reserves, motor torque limits, transmission dynamics, contact compliance and feedback control remain unverified. See [Feasible Region: an Actuation-Aware Extension of the Support Region](https://arxiv.org/abs/1903.07999) for why support geometry alone does not establish actuator feasibility. Rendering follows the official [MuJoCo visualization API](https://mujoco.readthedocs.io/en/3.17.0/APIreference/APIfunctions.html#mjv-initgeom).
+
+The panel now adds a separate [Static page](static-loads.md): it assumes equal left/right vertical loads, checks equilibrium and conditionally reports ideal joint-output torques. This does not change the meaning of the geometric overlay or the alignment search. A geometrically aligned candidate can still be outside the static page's distribution rule, and no motor capacity or controlled stability is verified.
 
 User learning completion and working hours are not inferred from these engineering checks.

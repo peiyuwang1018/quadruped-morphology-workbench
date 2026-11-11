@@ -16,6 +16,8 @@ from . import fusion_panel
 from .panel_model import Preview, load_morphology
 from .visualization import ContextSafeRenderer, camera
 from .support import add_support_overlay
+from .inspection import add_selection_overlay
+from .inspector_panel import InspectorPanel
 
 
 # UI distances are centimetres; the generator and saved files always use SI units.
@@ -78,6 +80,8 @@ class ParameterPanel:
         self.valid = False
         self.last_drag = None
         self.show_com = tk.BooleanVar(master=root, value=True)
+        self.inspect_active = tk.BooleanVar(master=root, value=False)
+        self.selected_body, self.include_children = "RL_thigh", False
         self.cam = camera()
         if self.fusion:
             self.cam.distance = 2.8 if shape.stance.upright else 2.4
@@ -95,14 +99,14 @@ class ParameterPanel:
         style = ttk.Style(self.root)
         style.configure("TFrame", background="#f4f6f8")
         style.configure("TLabel", background="#f4f6f8", foreground="#23364a", font=("Helvetica", 12))
-        style.configure("Heading.TLabel", font=("Helvetica", 20, "bold"))
+        style.configure("Heading.TLabel", font=("Helvetica", 16, "bold"))
         style.configure("Muted.TLabel", foreground="#65748a", font=("Helvetica", 11))
-        style.configure("Metric.TLabel", font=("Helvetica", 22, "bold"))
+        style.configure("Metric.TLabel", font=("Helvetica", 16, "bold"))
         style.configure("TButton", font=("Helvetica", 12), padding=(8, 5))
         outer = ttk.Frame(self.root, padding=18)
         outer.pack(fill="both", expand=True)
         header = ttk.Frame(outer)
-        header.pack(fill="x", pady=(0, 14))
+        header.pack(fill="x", pady=(0, 9))
         ttk.Label(header, text="Quadruped Workbench", style="Heading.TLabel").pack(side="left")
         subtitle = ("Coaxial motor layout" if self.edit_shape.profile == PROFILE else "Legacy motor layout") if self.fusion else "Explore shape and mass"
         ttk.Label(header, text=subtitle, style="Muted.TLabel").pack(side="left", padx=16)
@@ -125,7 +129,7 @@ class ParameterPanel:
             descriptions = (
                 ("Geometry", fusion_panel.GEOMETRY, "Negative z = lower shoulders.\nRanges are provisional."),
                 ("Stance", fusion_panel.stance_fields(self.edit_shape),
-                 (f"Upright concept hip range: {math.degrees(self.edit_shape.upright_limits.hip[0]):.0f} to {math.degrees(self.edit_shape.upright_limits.hip[1]):.0f} deg (unverified). Front limbs are held clear. A two-point support line has zero area."
+                 ("Concept limits (unverified).\nCoM updates; align separately."
                   if self.edit_shape.stance.upright else "Height uses the rear mounting datum. Foot x offsets use each datum's ground projection. Alignment moves foot targets, keeping geometry and masses fixed.")),
                 ("Mass", fusion_panel.MASS,
                  f"12 × {motor.mass:g} kg nominal modules (AKE90-8 reference). "
@@ -134,7 +138,7 @@ class ParameterPanel:
                  + mounting + "\n\nExtra/module = 0 means omitted. Frame and link mass remain uncalibrated estimates."),
             )
             for title, keys, description in descriptions:
-                tab = ttk.Frame(tabs, padding=10)
+                tab = ttk.Frame(tabs, padding=6 if title == 'Stance' and self.edit_shape.stance.upright else 10)
                 tabs.add(tab, text=title)
                 if title == 'Stance':
                     self.mode_var = tk.StringVar(value='Hind-leg upright' if self.edit_shape.stance.upright else 'Four-foot stance')
@@ -142,8 +146,20 @@ class ParameterPanel:
                                         values=('Four-foot stance','Hind-leg upright'))
                     mode.pack(fill='x',pady=(0,8))
                     mode.bind('<<ComboboxSelected>>',self.change_mode)
+                field_parents = {}
+                if title == 'Stance' and self.edit_shape.stance.upright:
+                    # Keep all controls usable at the supported 720 px height.
+                    # Seven stacked fields would clip the elbow control.
+                    self.upright_tabs = ttk.Notebook(tab, height=1)
+                    self.upright_tabs.pack(fill="both", expand=True, pady=(0, 4))
+                    body_fields = ttk.Frame(self.upright_tabs, padding=4)
+                    arm_fields = ttk.Frame(self.upright_tabs, padding=4)
+                    self.upright_tabs.add(body_fields, text="Body & feet")
+                    self.upright_tabs.add(arm_fields, text="Front limbs")
+                    ttk.Label(arm_fields, text="Mirrored joint angles", style="Muted.TLabel").pack(anchor="w", pady=(0, 8))
+                    field_parents = {key: arm_fields if key in fusion_panel.FRONT_LIMB_SPECS else body_fields for key in keys}
                 for key in keys:
-                    self._field(tab, key)
+                    self._field(field_parents.get(key, tab), key)
                 if title == 'Stance':
                     ttk.Button(tab,text='Align CoM projection',command=self.align_com).pack(fill='x',pady=(4,0))
                 note = ttk.Label(tab, text=description, style="Muted.TLabel", wraplength=250, justify="left")
@@ -163,16 +179,22 @@ class ParameterPanel:
         ttk.Button(cargo, text="Centre on back", command=self.seat_payload).pack(fill="x", pady=(4, 6))
         ttk.Label(cargo, text="Full box dimensions; position refers to its centre. Set mass to 0 to remove it.", style="Muted.TLabel", wraplength=220, justify="left").pack(anchor="w")
         actions = ttk.Frame(sidebar)
+        self.actions = actions
         actions.pack(fill="x", pady=(12, 0))
         ttk.Button(actions, text="Open config…", command=self.load).pack(side="left", expand=True, fill="x")
         ttk.Button(actions, text="Reset example", command=self.reset).pack(side="left", expand=True, fill="x", padx=(5, 0))
         self.save_button = ttk.Button(sidebar, text="Save config & model", command=self.save, state="disabled")
         self.save_button.pack(fill="x", pady=(7, 0))
+        self.inspector = InspectorPanel(sidebar, self.select_body)
+        if self.inspect_active.get():
+            self.tabs.pack_forget()
+            self.inspector.pack(fill="both", expand=True, before=actions)
         self.right = ttk.Frame(content)
         self.right.pack(side="left", fill="both", expand=True)
         toolbar = ttk.Frame(self.right)
         toolbar.pack(fill="x", pady=(0, 8))
-        ttk.Label(toolbar, text="Model preview", font=("Helvetica", 14, "bold")).pack(side="left")
+        ttk.Label(toolbar, text="Model preview", font=("Helvetica", 12, "bold")).pack(side="left")
+        ttk.Checkbutton(toolbar, text="Inspect", variable=self.inspect_active, command=self.toggle_inspector).pack(side="left", padx=10)
         for label, angle in (("Perspective", (135, -22)), ("Side", (90, -12)), ("Top", (90, -89))):
             ttk.Button(toolbar, text=label, command=lambda a=angle: self.set_camera(a)).pack(side="right", padx=2)
         self.canvas = tk.Canvas(self.right, bg="#263441", highlightthickness=0, cursor="hand2")
@@ -219,7 +241,7 @@ class ParameterPanel:
         ttk.Label(row, text=label).pack(side="left")
         ttk.Label(row, text=unit, style="Muted.TLabel", width=max(3, len(unit))).pack(side="right")
         entry_var = tk.StringVar()
-        entry_width = 9 if key in ('stance.front_x','stance.hind_x','stance.upright_hind_x') else 6
+        entry_width = 9 if key in ('stance.front_x','stance.hind_x','stance.upright_hind_x', *fusion_panel.FRONT_LIMB_SPECS) else 6
         entry = ttk.Entry(row, textvariable=entry_var, width=entry_width, justify="right")
         entry.pack(side="right", padx=(3, 4))
         slider = ttk.Scale(frame, from_=low, to=high,
@@ -277,8 +299,7 @@ class ParameterPanel:
             # Only the vertical target follows model height. User orbit and zoom persist.
             self.cam.lookat[2] = candidate.data.body("torso").xpos[2] * 0.65
             candidate_renderer.update_scene(candidate.data, camera=self.cam)
-            if self.show_com.get():
-                add_support_overlay(candidate_renderer.scene,candidate.report)
+            self.decorate_scene(candidate_renderer.scene, candidate)
             pixels = Image.fromarray(candidate_renderer.render().copy())
             old_renderer = self.renderer
             self.preview, self.renderer, self.pixels = candidate, candidate_renderer, pixels
@@ -286,6 +307,7 @@ class ParameterPanel:
             if old_renderer:
                 old_renderer.close()
             self._set_values(shape)
+            self.refresh_inspector()
             self.show_image()
             mass = candidate.report["mass_properties_preview_pose"]
             com_key = 'system_com_world_m' if self.fusion else 'system_com_torso_frame_m'
@@ -314,11 +336,36 @@ class ParameterPanel:
         support = self.preview.report['support']
         count = len(support['contact_legs'])
         if support['support_dimension'] == 1:
-            condition = f"Line error: {support['projection_distance_m']*1000:.3f} mm · Zero-area support; balance NOT verified."
+            condition = f"Line error: {support['projection_distance_m']*1000:.3f} mm · Zero-area support; stability NOT verified."
         else:
             status = 'Inside' if support['inside_or_on_support'] else 'Outside'
             condition = f"{status} support polygon · Signed margin: {support['signed_margin_m']*1000:.1f} mm · Geometry only."
         return f"{count} feet on ground · Max target error: {residual:.4f} mm\n{condition}"
+
+    def refresh_inspector(self):
+        if self.preview:
+            self.selected_body = self.inspector.refresh(self.preview, self.selected_body, self.include_children)
+
+    def toggle_inspector(self):
+        if self.inspect_active.get():
+            self.tabs.pack_forget()
+            self.inspector.pack(fill="both", expand=True, before=self.actions)
+            self.refresh_inspector()
+        else:
+            self.inspector.pack_forget()
+            self.tabs.pack(fill="both", expand=True, before=self.actions)
+        self.render_camera()
+
+    def select_body(self, name, include_children):
+        self.selected_body, self.include_children = name, include_children
+        self.refresh_inspector()
+        self.render_camera()
+
+    def decorate_scene(self, scene, preview):
+        if self.show_com.get():
+            add_support_overlay(scene, preview.report)
+        if self.inspect_active.get():
+            add_selection_overlay(scene, preview.model, preview.report, self.selected_body, self.include_children)
 
     def success_color(self):
         if self.fusion and self.preview:
@@ -355,8 +402,7 @@ class ParameterPanel:
         self.camera_job = None
         if self.renderer:
             self.renderer.update_scene(self.preview.data, camera=self.cam)
-            if self.show_com.get():
-                add_support_overlay(self.renderer.scene,self.preview.report)
+            self.decorate_scene(self.renderer.scene, self.preview)
             self.pixels = Image.fromarray(self.renderer.render().copy())
             self.show_image()
 

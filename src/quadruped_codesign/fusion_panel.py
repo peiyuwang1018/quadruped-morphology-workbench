@@ -36,6 +36,13 @@ UPRIGHT_SPECS = {
     "stance.upright_hind_width": ("Hind foot spacing", "mm", 1000, 1),
     "stance.upright_hind_x": ("Hind foot x offset", "mm", 1000, 1),
 }
+FRONT_LIMB_SPECS = {
+    "stance.front_roll": ("Shoulder roll", "deg", 180/math.pi, .5),
+    "stance.front_hip": ("Shoulder pitch", "deg", 180/math.pi, .5),
+    "stance.front_knee": ("Elbow angle", "deg", 180/math.pi, .5),
+}
+FRONT_JOINTS = dict(zip(FRONT_LIMB_SPECS, ("roll", "hip", "knee")))
+UPRIGHT_SPECS.update(FRONT_LIMB_SPECS)
 
 
 def specs(shape):
@@ -54,9 +61,25 @@ def get_value(shape, name):
     return shape
 
 
+def front_angle_limits(shape, key):
+    low, high = getattr(shape.upright_limits, FRONT_JOINTS[key])
+    if key == "stance.front_roll":
+        low, high = max(low, -high), min(high, -low)
+    if low >= high:
+        raise ValueError("Upright roll limits do not allow mirrored front-limb adjustment.")
+    return low, high
+
+
 def panel_fields(shape):
-    result = {key: (label, unit, *(v*factor for v in shape.bounds[key]), step)
-              for key, (label, unit, factor, step) in specs(shape).items()}
+    result = {}
+    for key, (label, unit, factor, step) in specs(shape).items():
+        if key in FRONT_JOINTS:
+            # These are direct joint angles, so use the saved concept joint
+            # limits. Roll must be valid for BOTH mirrored front limbs.
+            low, high = front_angle_limits(shape, key)
+        else:
+            low, high = shape.bounds[key]
+        result[key] = (label, unit, low*factor, high*factor, step)
     result["payload_mass"] = ("Payload mass", "kg", *shape.bounds["payload.mass"], .1)
     for key, label, low, high in (
         ("size_x", "Box length", 50, 500), ("size_y", "Box width", 40, 260),
@@ -84,9 +107,15 @@ def shape_from_panel(values, original):
         except (TypeError, ValueError):
             raise ValueError(f"{label}: enter a number.") from None
         if not math.isfinite(value) or not low-1e-6 <= value <= high+1e-6:
-            raise ValueError(f"{label}: enter {low:g} to {high:g} {unit} (provisional exploration range).")
+            limit_kind = "concept joint limits" if key in FRONT_JOINTS else "provisional exploration range"
+            raise ValueError(f"{label}: enter {low:g} to {high:g} {unit} ({limit_kind}).")
         factor = active_specs[key][2] if key in active_specs else (1000 if unit == "mm" else 1)
         checked[key] = value/factor
+        if key in FRONT_JOINTS:
+            # Text formatting of an endpoint in degrees must not overshoot its
+            # exact radian limit. Only roundoff already accepted above is clipped.
+            joint_low, joint_high = front_angle_limits(original, key)
+            checked[key] = min(joint_high, max(joint_low, checked[key]))
     direct = {key: checked[key] for key in active_specs if "." not in key}
     stance = replace(original.stance, **{key.split(".")[1]: checked[key] for key in stance_fields(original)})
     motor = replace(original.motor, extra_mass=checked["motor.extra_mass"])

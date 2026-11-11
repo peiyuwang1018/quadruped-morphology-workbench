@@ -58,6 +58,8 @@ Module rigid-body inertia is approximated by a uniform cylinder of the nominal p
 
 Validation covers compiled forward kinematics against foot targets, foot-surface height, hip height, analytic masses/local centres/full inertia tensors, coaxiality and axial spacing of the motor pair, the upper-link start relative to the outer motor, pairwise motor-envelope overlap, and active proxy-contact penetration at this pose. It does not certify real CAD interference, parent-child structure clearances, all joint positions, static equilibrium, contact forces, torque feasibility or standing control. Range acceptance and geometric contact are insufficient evidence of hardware feasibility.
 
+The panel now adds a separate [static-load baseline](static-loads.md) with explicit equal-left/right vertical reactions and conditional ideal joint-output torques. Its balance status is independent of the above geometry checks and is saved in `statics`. It does not certify motor capacity, transmission loads or controlled standing.
+
 ## Reproduce and inspect
 
 ```sh

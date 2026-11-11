@@ -19,7 +19,7 @@ It is a research reference for procedural morphology generation and future morph
 
 | Component | Role | Upstream |
 |---|---|---|
-| MuJoCo | MJCF compilation, kinematics, contact-distance queries and rendering | [google-deepmind/mujoco](https://github.com/google-deepmind/mujoco), [Python documentation](https://mujoco.readthedocs.io/en/stable/python.html) |
+| MuJoCo | MJCF compilation, kinematics, recursive Newton–Euler and Jacobians for static loads, contact-distance queries and rendering | [google-deepmind/mujoco](https://github.com/google-deepmind/mujoco), [Python documentation](https://mujoco.readthedocs.io/en/stable/python.html) |
 | NumPy | Numerical geometry, transforms and validation | [numpy/numpy](https://github.com/numpy/numpy) |
 | Pillow | Rendered image display and export | [python-pillow/Pillow](https://github.com/python-pillow/Pillow) |
 | Python standard library | Tkinter UI, TOML loading, XML generation, tests and CLI | [Python documentation](https://docs.python.org/3.12/) |
@@ -33,6 +33,8 @@ Dependencies are installed separately rather than vendored. Exact resolved versi
 - The nominal AKE90-8 KV35 module dimensions and mass are referenced to the [manufacturer's product page](https://www.cubemars.com/product/ake90-8-kv35-quasi-direct-drive-actuator.html). The 118 × 60 mm clearance envelope is an assembly assumption, separate from nominal module dimensions. No manufacturer CAD model is bundled.
 - Inverse kinematics uses an analytic roll joint plus a planar two-link construction with a lateral offset. Mass/inertia checks use standard box, cylinder, sphere and capsule formulas and the parallel-axis theorem. They are implemented here, rather than copied from a robot-specific generator.
 - Support-region visualization is geometric screening. [Feasible Region: an Actuation-Aware Extension of the Support Region](https://arxiv.org/abs/1903.07999) is background reading on the additional role of actuator constraints, not an algorithm implemented by this workbench.
+
+The body/subtree inspector and static pair-load evaluator were also implemented in this project. The latter uses MuJoCo's dynamics primitives under explicit equal-left/right vertical loading assumptions; it does not integrate Pinocchio or a research project's optimization method. The implementation is documented in [English](documents/kinematics-dynamics-en.md) and [Chinese](documents/kinematics-dynamics-zh.md).
 
 ## Project licensing
 

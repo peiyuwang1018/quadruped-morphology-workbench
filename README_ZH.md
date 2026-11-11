@@ -4,6 +4,8 @@
 
 [English README](README.md) · [英文详细操作](README_EN.md) · [代码来源与参考项目](SOURCES.md)
 
+实现原理：[中文版](documents/kinematics-dynamics-zh.md) · [English](documents/kinematics-dynamics-en.md)，涵盖解析 IK、质量惯量、支撑几何与静力关节需求。
+
 ![四足与后肢直立姿态](docs/images/pose-preview.png)
 
 ## 开发基础与来源
@@ -33,9 +35,17 @@ uv sync --locked
 
 **Geometry** 调整前后腿长和安装间距；**Stance** 调整姿态与足端目标；**Mass** 调整声明的质量估计；**Payload** 调整固定载荷。Fusion 界面使用 mm、deg、kg，配置文件使用 SI 单位，重心读数为世界坐标。无效参数会保留上次有效预览并禁止保存。
 
+后肢直立时，**Stance → Front limbs** 可调整左右镜像的肩滚转、肩俯仰与肘角。前肢改变后会重新计算重心，但不会自动移动后足；需要时单独点击对齐。
+
+勾选预览上方的 **Inspect**，左侧切换为部件查看器。选择部件后，**Mass** 显示质量来源、局部/世界质心与惯量，**Pose** 显示关节角度和派生尺寸，**Model** 显示整机质量、实际足间距和包络间隙。**Selected body** 只看当前刚体，**Body + descendants** 包含其下游刚体；橙色高亮和白色质心标记对应当前选择。取消 **Inspect** 即可回到参数编辑。详细定义和实验见 [部件查看说明](docs/model-inspector.md)。
+
+**Inspect → Static** 查看整机静力基准：平地、重力、左右均分、仅竖直支撑力。先验证整机力与力矩平衡，再给出各关节输出端力矩。默认后肢直立姿态未平衡；单独点击对齐后，才在容差内报告关节需求。前臂姿态改变后可能再次失衡。横向重心偏置需要不等分配，显示超出当前基准；不把它当作机器人一定无法站立。未平衡候选仍可保存，其力矩结果留空。公式、例子及范围见 [静力计算说明](docs/static-loads.md)。
+
 ## 输出与验证
 
-每个候选保存到 `outputs/panel/时间戳/`，包括完整配置、MJCF、检查报告、当前渲染图和范围说明。输出与虚拟环境不进入 Git。
+每个候选保存到 `outputs/panel/时间戳/`，包括完整配置、MJCF、检查报告、当前渲染图和范围说明。检查报告的 `inspection` 字段包含所有部件及其下游组合的完整精度数据，使用 SI 单位。输出与虚拟环境不进入 Git。
+
+`statics` 字段另存分配规则、支撑力、平衡残差和满足条件时的关节力矩。顶层 `passed` 仍只表示几何/运动学检查通过，静力结果请读 `statics.equilibrium_within_tolerance`。
 
 ```sh
 .venv/bin/python -m quadruped_codesign.cli generate --config configs/fusion_reference.toml --output outputs/robot.xml
@@ -45,11 +55,13 @@ uv sync --locked
 QUADRUPED_UI_TESTS=1 .venv/bin/python -m unittest discover -s tests -v
 ```
 
-macOS 独立 MuJoCo 查看器需要用 `.venv/bin/mjpython -m quadruped_codesign.cli view outputs/robot.xml`；参数窗口使用普通 Python。当前完整桌面测试共 41 项。早期八关节教学配置和 Fusion v1 快照仍可重载。
+macOS 独立 MuJoCo 查看器需要用 `.venv/bin/mjpython -m quadruped_codesign.cli view outputs/robot.xml`；参数窗口使用普通 Python。测试覆盖运动学、质量惯量、部件聚合、窗口交互和渲染重绘。早期八关节教学配置和 Fusion v1 快照仍可重载。
 
 ## 当前边界
 
 这是构型与冻结姿态探索工具。十二关节模型尚无 actuator；传动、转子惯量、力矩/速度限制、主动站立控制、步态与 RL 尚未实现。Isaac Lab 迁移未经验证。
+
+静力页给出的是当前简化模型的理想关节输出端需求。近端同轴电机的传动映射与效率未定，不能直接把结果当作电机轴力矩，也不代表电机容量、真实站立稳定性或最优构型。
 
 部分安装距离、框架质量、连杆密度和关节范围仍为明确声明的估计。示例总质量约 30.53 kg，不能作为实机辨识值。直立使用单独暂定的髋范围约 −77° 至 +160°，未按硬件校准。
 
